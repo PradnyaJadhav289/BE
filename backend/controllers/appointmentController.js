@@ -5,7 +5,7 @@ import Appointment from "../models/Appointment.js";
 export const getAcceptedAppointmentsByPatient = async (req, res) => {
   try {
     const appointments = await Appointment.find({
-      patientId: req.user._id, // from token
+      patient: req.user._id, // from token
       status: "Accepted",
     }).populate("doctorId", "name speciality");
 
@@ -21,11 +21,11 @@ export const getMyAppointments = async (req, res) => {
   try {
     const filter =
       req.user.role === "doctor"
-        ? { doctorId: req.user._id }
-        : { patientId: req.user._id };
+        ? { doctor: req.user._id }
+        : { patient: req.user._id };
 
     const appointments = await Appointment.find(filter).populate(
-      "patientId doctorId",
+      "patient doctor",
       "name email role"
     );
 

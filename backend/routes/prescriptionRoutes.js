@@ -1,32 +1,25 @@
-import express from "express";
-import fs from "fs";
-import path from "path";
-import axios from "axios";
+// backend/routes/prescriptionRoutes.js
+import express from 'express';
+import { protect } from '../middleware/authMiddleware.js';
+import {
+  generatePrescription,
+  getPatientPrescriptions,
+  getDoctorPrescriptions,
+  getPrescriptionById,
+} from '../controllers/prescriptionController.js';
 
 const router = express.Router();
 
-// POST /api/prescription/generate
-router.post("/generate", async (req, res) => {
-  try {
-    const { filename } = req.body; // transcript file saved earlier
-    const filePath = path.join(process.cwd(), "upload", filename);
+// POST /api/prescriptions/generate   — Doctor triggers AI generation after call
+router.post('/generate', protect, generatePrescription);
 
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "Transcript file not found" });
-    }
+// GET  /api/prescriptions/patient/:patientId
+router.get('/patient/:patientId', protect, getPatientPrescriptions);
 
-    const conversationJSON = JSON.parse(fs.readFileSync(filePath, "utf8"));
+// GET  /api/prescriptions/doctor/:doctorId
+router.get('/doctor/:doctorId', protect, getDoctorPrescriptions);
 
-    // Call Python AI service
-    const response = await axios.post("http://localhost:8000/generate", {
-      conversation: conversationJSON,
-    });
-
-    res.json({ prescription: response.data.prescription });
-  } catch (err) {
-    console.error("Error generating prescription:", err);
-    res.status(500).json({ error: "Failed to generate prescription" });
-  }
-});
+// GET  /api/prescriptions/:id
+router.get('/:id', protect, getPrescriptionById);
 
 export default router;

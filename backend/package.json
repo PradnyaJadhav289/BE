@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@google-cloud/speech": "^7.2.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",

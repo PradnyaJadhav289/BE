@@ -1,0 +1,46 @@
+{
+  "room": "6916d871b8cd4a689dd5972c",
+  "savedAt": "2026-03-04T09:36:06.900Z",
+  "conversation": [
+    {
+      "speaker": "patient",
+      "original": "hello ",
+      "translated": "'AUTO' IS AN INVALID SOURCE LANGUAGE . EXAMPLE: LANGPAIR=EN|IT USING 2 LETTER ISO OR RFC3066 LIKE ZH-CN. ALMOST ALL LANGUAGES SUPPORTED BUT SOME MAY HAVE NO CONTENT"
+    },
+    {
+      "speaker": "patient",
+      "original": "hello ",
+      "translated": "hello"
+    },
+    {
+      "speaker": "patient",
+      "original": " how are you ",
+      "translated": "you have kakaotalk"
+    },
+    {
+      "speaker": "patient",
+      "original": " how are you ",
+      "translated": "you have kakaotalk"
+    },
+    {
+      "speaker": "patient",
+      "original": " language ",
+      "translated": "Language"
+    },
+    {
+      "speaker": "patient",
+      "original": " what ",
+      "translated": "What"
+    },
+    {
+      "speaker": "patient",
+      "original": " means ",
+      "translated": "Means"
+    },
+    {
+      "speaker": "patient",
+      "original": " how are you ",
+      "translated": "you have kakaotalk"
+    }
+  ]
+}

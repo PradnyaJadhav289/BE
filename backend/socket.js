@@ -1,61 +1,89 @@
 // backend/socket.js
-import { Server } from "socket.io";
+import { Server } from 'socket.io';
 
 export const initializeSocket = (server) => {
   const io = new Server(server, {
     cors: {
       origin: [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:5174",
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://localhost:5174',
         process.env.FRONTEND_URL,
       ].filter(Boolean),
-      methods: ["GET", "POST"],
+      methods:     ['GET', 'POST'],
       credentials: true,
     },
   });
 
-  io.on("connection", (socket) => {
-    console.log("✅ User connected:", socket.id);
+  io.on('connection', (socket) => {
+    console.log('✅ User connected:', socket.id);
 
-    // Doctor/Patient joins the appointment room
-    socket.on("join-room", ({ roomId, userId, role }) => {
+    // ── Room Join ──────────────────────────────────────────────────────────────
+    // ✅ Fixed: frontend was sending positional args (roomId, userId, userName, role)
+    //          backend was destructuring an object → mismatch.
+    //          Now handles BOTH calling conventions.
+    socket.on('join-room', (roomIdOrObj, userId, userName, role) => {
+      let roomId, uid, uname, urole;
+
+      if (typeof roomIdOrObj === 'object' && roomIdOrObj !== null) {
+        // Object style: { roomId, userId, role }
+        ({ roomId, userId: uid, role: urole } = roomIdOrObj);
+        uname = uid;
+      } else {
+        // Positional style: (roomId, userId, userName, role)
+        roomId = roomIdOrObj;
+        uid    = userId;
+        uname  = userName;
+        urole  = role;
+      }
+
       socket.join(roomId);
-      console.log(`${role} (${userId}) joined room: ${roomId}`);
-      io.to(roomId).emit("user-joined", { userId, role });
+      socket.data.roomId = roomId;
+      socket.data.userId = uid;
+      socket.data.role   = urole;
+
+      console.log(`${urole} (${uid}) joined room: ${roomId}`);
+
+      // Notify others in room
+      socket.to(roomId).emit('user-joined', uid, uname);
     });
 
-    // Doctor starts call
-    socket.on("start-call", ({ roomId }) => {
-      io.to(roomId).emit("incoming-call");
+    // ── Leave room on disconnect ───────────────────────────────────────────────
+    socket.on('disconnect', () => {
+      const { roomId, userId } = socket.data || {};
+      if (roomId) socket.to(roomId).emit('user-left', userId, userId);
+      console.log('❌ User disconnected:', socket.id);
     });
 
-    // Patient accepts call
-    socket.on("accept-call", ({ roomId }) => {
-      io.to(roomId).emit("call-accepted");
+    // ── Call Signaling ─────────────────────────────────────────────────────────
+    socket.on('incoming-call', (data) => {
+      socket.to(data.roomId).emit('incoming-call', data);
     });
 
-    // WebRTC signaling (offer/answer/ICE)
-    socket.on("offer", ({ roomId, offer }) => {
-      socket.to(roomId).emit("offer", offer);
+    socket.on('accept-call', (data) => {
+      socket.to(data.roomId).emit('call-accepted', data);
     });
 
-    socket.on("answer", ({ roomId, answer }) => {
-      socket.to(roomId).emit("answer", answer);
+    socket.on('reject-call', (data) => {
+      socket.to(data.roomId).emit('call-rejected', data);
     });
 
-    socket.on("ice-candidate", ({ roomId, candidate }) => {
-      socket.to(roomId).emit("ice-candidate", candidate);
+    // ── WebRTC Signaling ───────────────────────────────────────────────────────
+    socket.on('offer', (data) => {
+      socket.to(data.roomId).emit('offer', data);
     });
 
-    // End call
-    socket.on("end-call", ({ roomId }) => {
-      io.to(roomId).emit("call-ended");
+    socket.on('answer', (data) => {
+      socket.to(data.roomId).emit('answer', data);
     });
 
-    // Disconnect
-    socket.on("disconnect", () => {
-      console.log("❌ User disconnected:", socket.id);
+    socket.on('ice-candidate', (data) => {
+      socket.to(data.roomId).emit('ice-candidate', data);
+    });
+
+    // ── End Call ───────────────────────────────────────────────────────────────
+    socket.on('end-call', ({ roomId }) => {
+      io.to(roomId).emit('call-ended');
     });
   });
 

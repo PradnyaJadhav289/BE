@@ -4,6 +4,18 @@ import path from "path";
 
 const router = express.Router();
 
+// ✅ ADD THIS — list all saved transcript files
+router.get("/transcripts/list", (req, res) => {
+  try {
+    const files = fs.readdirSync(uploadDir)
+      .filter(f => f.endsWith(".json"))
+      .sort()
+      .reverse(); // newest first
+    res.json(files);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to list transcripts" });
+  }
+});
 // Ensure /upload folder exists
 const uploadDir = path.join(process.cwd(), "upload");
 if (!fs.existsSync(uploadDir)) {

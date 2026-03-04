@@ -5,7 +5,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('user'));
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
 
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -16,102 +16,59 @@ const Navbar = () => {
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-primary shadow">
       <div className="container">
-        <Link className="navbar-brand fw-bold fs-4" to="/">
-          🩺 MediConnect
-        </Link>
+        <Link className="navbar-brand fw-bold fs-4" to="/">🩺 MediConnect</Link>
 
-        <button
-          className="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#mediconnectNavbar"
-          aria-controls="mediconnectNavbar"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
-        >
-          <span className="navbar-toggler-icon"></span>
+        <button className="navbar-toggler" type="button"
+          data-bs-toggle="collapse" data-bs-target="#navbarMain">
+          <span className="navbar-toggler-icon" />
         </button>
 
-        <div className="collapse navbar-collapse" id="mediconnectNavbar">
-          <ul className="navbar-nav ms-auto mb-2 mb-lg-0 gap-2">
+        <div className="collapse navbar-collapse" id="navbarMain">
+          <ul className="navbar-nav ms-auto mb-2 mb-lg-0 gap-1">
             {user ? (
               <>
-                {/* Common Dashboard Link */}
                 <li className="nav-item">
-                  <NavLink 
-                    to={user.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard'} 
-                    className="nav-link"
-                  >
-                    <i className="fas fa-home me-1"></i>
-                    Dashboard
-                  </NavLink>
+                  <NavLink to={user.role === 'doctor' ? '/doctor/dashboard' : '/patient/dashboard'}
+                           className="nav-link">🏠 Dashboard</NavLink>
                 </li>
 
-                {/* Doctor Specific Links */}
                 {user.role === 'doctor' && (
                   <>
                     <li className="nav-item">
-                      <NavLink to="/doctor/appointments" className="nav-link">
-                        <i className="fas fa-calendar-check me-1"></i>
-                        Manage Appointments
-                      </NavLink>
+                      <NavLink to="/doctor/appointments" className="nav-link">📅 Appointments</NavLink>
                     </li>
                     <li className="nav-item">
-                      <NavLink to="/doctor/video-consultations" className="nav-link">
-                        <i className="fas fa-video me-1"></i>
-                        Video Consultations
-                      </NavLink>
+                      <NavLink to="/doctor/prescription" className="nav-link">💊 Prescriptions</NavLink>
                     </li>
                   </>
                 )}
 
-                {/* Patient Specific Links */}
                 {user.role === 'patient' && (
                   <>
                     <li className="nav-item">
-                      <NavLink to="/patient/appointments" className="nav-link">
-                        <i className="fas fa-calendar-plus me-1"></i>
-                        Book Appointment
-                      </NavLink>
+                      <NavLink to="/patient/appointments"  className="nav-link">📅 Book</NavLink>
                     </li>
                     <li className="nav-item">
-                      <NavLink to="/patient/consultations" className="nav-link">
-                        <i className="fas fa-video me-1"></i>
-                        Video Consultations
-                      </NavLink>
+                      <NavLink to="/patient/consultations" className="nav-link">📹 Consultations</NavLink>
+                    </li>
+                    <li className="nav-item">
+                      <NavLink to="/patient/prescriptions" className="nav-link">💊 Prescriptions</NavLink>
                     </li>
                   </>
                 )}
 
-                {/* User Info and Logout */}
                 <li className="nav-item dropdown">
-                  <a
-                    className="nav-link dropdown-toggle"
-                    href="#"
-                    id="userDropdown"
-                    role="button"
-                    data-bs-toggle="dropdown"
-                    aria-expanded="false"
-                  >
-                    <i className="fas fa-user me-1"></i>
-                    {user.name}
+                  <a className="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                    👤 {user.name}
                   </a>
-                  <ul className="dropdown-menu" aria-labelledby="userDropdown">
-                    <li>
-                      <span className="dropdown-item-text">
-                        <small className="text-muted">
-                          Logged in as: <strong className="text-capitalize">{user.role}</strong>
-                        </small>
-                      </span>
-                    </li>
+                  <ul className="dropdown-menu">
+                    <li><span className="dropdown-item-text text-muted small">
+                      Role: <strong className="text-capitalize">{user.role}</strong>
+                    </span></li>
                     <li><hr className="dropdown-divider" /></li>
                     <li>
-                      <button 
-                        className="dropdown-item text-danger" 
-                        onClick={handleLogout}
-                      >
-                        <i className="fas fa-sign-out-alt me-2"></i>
-                        Logout
+                      <button className="dropdown-item text-danger" onClick={handleLogout}>
+                        🚪 Logout
                       </button>
                     </li>
                   </ul>
@@ -119,18 +76,8 @@ const Navbar = () => {
               </>
             ) : (
               <>
-                <li className="nav-item">
-                  <NavLink to="/login" className="nav-link">
-                    <i className="fas fa-sign-in-alt me-1"></i>
-                    Login
-                  </NavLink>
-                </li>
-                <li className="nav-item">
-                  <NavLink to="/register" className="nav-link">
-                    <i className="fas fa-user-plus me-1"></i>
-                    Register
-                  </NavLink>
-                </li>
+                <li className="nav-item"><NavLink to="/login"    className="nav-link">Login</NavLink></li>
+                <li className="nav-item"><NavLink to="/register" className="nav-link">Register</NavLink></li>
               </>
             )}
           </ul>

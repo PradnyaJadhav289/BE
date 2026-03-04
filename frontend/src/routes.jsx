@@ -1,74 +1,45 @@
+// frontend/src/routes.jsx
 import { Routes, Route } from 'react-router-dom';
-import Navbar from './components/Navbar';
-import Login from './pages/Login.jsx';
-import Register from './pages/Register.jsx';
-import DoctorDashboard from './Doctor/DoctorDashboard.jsx';
-import PatientDashboard from './Patient/PatientDashboard.jsx';
-import DoctorManageAppointments from './Doctor/ManageAppointments.jsx';
+import Navbar            from './components/Navbar.jsx';
+import Login             from './pages/Login.jsx';
+import Register          from './pages/Register.jsx';
+import DoctorDashboard   from './Doctor/DoctorDashboard.jsx';
+import PatientDashboard  from './Patient/PatientDashboard.jsx';
+import ManageAppointments   from './Doctor/ManageAppointments.jsx';
 import DoctorVideoConsultation from './Doctor/DoctorVideoConsultion.jsx';
-import PatientAppointments from './Patient/BookAppointment.jsx';
-import AppointmentCard from './components/AppointmentCard.jsx';
-import VideoCall from './components/VideoCall.jsx';
-import JoinConsultation from './Patient/JoinConsultation.jsx';
-import DebugAppointments from './components/DebugAppointments.jsx';
-import PatientVideoCall from './Patient/PatientVideoCall.jsx';
-import ProtectedRoute from './routes/ProtectedRoute.jsx';
+import GeneratePrescription    from './Doctor/GeneratePrescription.jsx';
+import BookAppointment    from './Patient/BookAppointment.jsx';
+import JoinConsultation   from './Patient/JoinConsultation.jsx';
+import MyPrescriptions    from './Patient/MyPrescriptions.jsx';       // ✅ Added
+import PatientVideoCall   from './Patient/PatientVideoCall.jsx';
+import ProtectedRoute     from './routes/ProtectedRoute.jsx';
 
+const AppRouter = () => (
+  <>
+    <Navbar />
+    <Routes>
+      {/* ── Auth ── */}
+      <Route path="/login"    element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
-const AppRouter = () => {
-  return (
-    <>
-      <Navbar />
-      <Routes>
-        {/* Auth Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        
-        {/* Dashboard Routes */}
-        <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
-        <Route path="/patient/dashboard" element={<PatientDashboard />} />
+      {/* ── Doctor ── */}
+      <Route path="/doctor/dashboard"     element={<ProtectedRoute role="doctor"><DoctorDashboard /></ProtectedRoute>} />
+      <Route path="/doctor/appointments"  element={<ProtectedRoute role="doctor"><ManageAppointments /></ProtectedRoute>} />
+      <Route path="/doctor/prescription"  element={<ProtectedRoute role="doctor"><GeneratePrescription /></ProtectedRoute>} />
+      <Route path="/doctor/videoCall"     element={<ProtectedRoute role="doctor"><DoctorVideoConsultation /></ProtectedRoute>} />
 
-        {/* Doctor Routes */}
-        <Route path="/doctor/appointments" element={<DoctorManageAppointments />} />
-        
+      {/* ── Patient ── */}
+      <Route path="/patient/dashboard"      element={<ProtectedRoute role="patient"><PatientDashboard /></ProtectedRoute>} />
+      <Route path="/patient/appointments"   element={<ProtectedRoute role="patient"><BookAppointment /></ProtectedRoute>} />
+      <Route path="/patient/consultations"  element={<ProtectedRoute role="patient"><JoinConsultation /></ProtectedRoute>} />
+      <Route path="/patient/prescriptions"  element={<ProtectedRoute role="patient"><MyPrescriptions /></ProtectedRoute>} /> {/* ✅ */}
+      <Route path="/patient/videoCall"      element={<ProtectedRoute role="patient"><PatientVideoCall /></ProtectedRoute>} />
 
-
-        <Route
-  path="/doctor/videoCall"
-  element={
-    <ProtectedRoute role="doctor">
-      <DoctorVideoConsultation />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/patient/videoCall"
-  element={
-    <ProtectedRoute role="patient">
-      <PatientVideoCall />
-    </ProtectedRoute>
-  }
-/>
-
-
-        {/* Patient Routes */}
-        <Route path="/patient/appointments" element={<PatientAppointments />} />
-        <Route path="/patient/consultations" element={<JoinConsultation />} />
-        
-
-        {/* Shared Routes */}
-        <Route path="/video-call" element={<VideoCall />} />
-        <Route path="/appointment-form" element={<AppointmentCard />} />
-        
-        {/* Debug Route - Remove in production */}
-        <Route path="/debug" element={<DebugAppointments />} />
-
-        {/* Default Routes */}
-        <Route path="/" element={<Login />} />
-        <Route path="*" element={<Login />} />
-      </Routes>
-    </>
-  );
-};
+      {/* ── Default ── */}
+      <Route path="/"  element={<Login />} />
+      <Route path="*"  element={<Login />} />
+    </Routes>
+  </>
+);
 
 export default AppRouter;
