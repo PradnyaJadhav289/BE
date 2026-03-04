@@ -2,9 +2,9 @@
 gcloud-key.json
 node_modules/
 .env
+*.env
 backend/.env
 frontend/.env
-*.env
 dist/
 build/
 upload/
