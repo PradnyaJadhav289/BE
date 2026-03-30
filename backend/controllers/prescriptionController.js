@@ -7,6 +7,8 @@ import fs from 'fs';
 import path from 'path';
 import Anthropic from '@anthropic-ai/sdk';
 import Prescription from '../models/prescription.js';
+import Appointment from '../models/Appointment.js';
+import User from '../models/User.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -38,19 +40,57 @@ Return exactly this structure:
 If a field has no data, use null for strings or [] for arrays. Never guess medications — 
 only extract what the doctor explicitly mentioned.`;
 
+// ── Get Doctor's Appointments with Patient Details ─────────────────────────────
+export const getDoctorAppointments = async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+
+    // Fetch all completed/accepted appointments for this doctor
+    const appointments = await Appointment.find({ 
+      doctor: doctorId,
+      status: { $in: ['completed', 'accepted'] }
+    })
+      .populate('patient', 'name age contact location')
+      .sort({ createdAt: -1 });
+
+    // Return simplified data for dropdown
+    const appointmentList = appointments.map(apt => ({
+      appointmentId: apt._id,
+      patientId: apt.patient._id,
+      patientName: apt.patient.name,
+      scheduledDate: apt.scheduledDate,
+      symptoms: apt.symptoms,
+    }));
+
+    res.json(appointmentList);
+  } catch (err) {
+    console.error('getDoctorAppointments error:', err);
+    res.status(500).json({ error: 'Failed to fetch appointments', detail: err.message });
+  }
+};
+
+// ── AI System Prompt ───────────────────────────────────────────────────────────
+
 // ── Generate Prescription from Transcript ─────────────────────────────────────
 export const generatePrescription = async (req, res) => {
   try {
-    const { appointmentId, patientId, doctorId, transcriptFile } = req.body;
+    const { appointmentId, patientId, patientName, doctorId, transcriptFile } = req.body;
 
     if (!appointmentId || !patientId || !doctorId || !transcriptFile) {
       return res.status(400).json({ error: 'appointmentId, patientId, doctorId, transcriptFile are required' });
     }
 
     // Read transcript JSON from /upload folder
-    const filePath = path.join(process.cwd(), 'upload', transcriptFile);
+    // Support both old format (abc123.json) and new patient-name format (PatientName.json)
+    let filePath = path.join(process.cwd(), 'upload', transcriptFile);
+    
+    // If file doesn't exist and doesn't have extension, try with patient name
+    if (!fs.existsSync(filePath) && !transcriptFile.endsWith('.json')) {
+      filePath = path.join(process.cwd(), 'upload', `${patientName}.json`);
+    }
+    
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Transcript file not found' });
+      return res.status(404).json({ error: 'Transcript file not found', attempted: filePath });
     }
 
     const transcriptData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -158,5 +198,120 @@ export const getPrescriptionById = async (req, res) => {
     res.json(prescription);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch prescription' });
+  }
+};
+
+// ── Doctor Sends Prescription to Patient ──────────────────────────────────────
+export const sendPrescriptionToPatient = async (req, res) => {
+  try {
+    const { prescriptionId } = req.params;
+    const { doctorId } = req.body;
+
+    const prescription = await Prescription.findById(prescriptionId);
+    if (!prescription) {
+      return res.status(404).json({ error: 'Prescription not found' });
+    }
+
+    // Verify the doctor owns this prescription
+    if (prescription.doctorId.toString() !== doctorId) {
+      return res.status(403).json({ error: 'Unauthorized: Only the prescribing doctor can send' });
+    }
+
+    // Update status to 'sent'
+    prescription.prescriptionStatus = 'sent';
+    prescription.sentAt = new Date();
+    await prescription.save();
+
+    await prescription.populate([
+      { path: 'patientId', select: 'name email age contact' },
+      { path: 'doctorId',  select: 'name specialization email' },
+    ]);
+
+    res.status(200).json({ 
+      message: 'Prescription sent to patient successfully',
+      prescription 
+    });
+  } catch (err) {
+    console.error('sendPrescriptionToPatient error:', err);
+    res.status(500).json({ error: 'Failed to send prescription', detail: err.message });
+  }
+};
+
+// ── Patient Verifies/Views Prescription ───────────────────────────────────────
+export const verifyprescription = async (req, res) => {
+  try {
+    const { prescriptionId } = req.params;
+    const { patientId } = req.body;
+
+    const prescription = await Prescription.findById(prescriptionId);
+    if (!prescription) {
+      return res.status(404).json({ error: 'Prescription not found' });
+    }
+
+    // Verify the patient owns this prescription
+    if (prescription.patientId.toString() !== patientId) {
+      return res.status(403).json({ error: 'Unauthorized: Cannot verify others\' prescriptions' });
+    }
+
+    // Update status to 'verified'
+    prescription.prescriptionStatus = 'verified';
+    prescription.verifiedAt = new Date();
+    await prescription.save();
+
+    await prescription.populate([
+      { path: 'patientId', select: 'name age contact' },
+      { path: 'doctorId',  select: 'name specialization' },
+    ]);
+
+    res.status(200).json({ 
+      message: 'Prescription verified successfully',
+      prescription 
+    });
+  } catch (err) {
+    console.error('verifyprescription error:', err);
+    res.status(500).json({ error: 'Failed to verify prescription', detail: err.message });
+  }
+};
+
+// ── Patient Acknowledges Prescription ─────────────────────────────────────────
+export const acknowledgePrescription = async (req, res) => {
+  try {
+    const { prescriptionId } = req.params;
+    const { patientId, verificationNotes } = req.body;
+
+    const prescription = await Prescription.findById(prescriptionId);
+    if (!prescription) {
+      return res.status(404).json({ error: 'Prescription not found' });
+    }
+
+    // Verify the patient owns this prescription
+    if (prescription.patientId.toString() !== patientId) {
+      return res.status(403).json({ error: 'Unauthorized: Cannot acknowledge others\' prescriptions' });
+    }
+
+    // Update status to 'acknowledged'
+    prescription.prescriptionStatus = 'acknowledged';
+    prescription.acknowledgedAt = new Date();
+    if (verificationNotes) {
+      prescription.verificationNotes = verificationNotes;
+    }
+    // If not yet verified, mark as verified too
+    if (!prescription.verifiedAt) {
+      prescription.verifiedAt = new Date();
+    }
+    await prescription.save();
+
+    await prescription.populate([
+      { path: 'patientId', select: 'name age contact' },
+      { path: 'doctorId',  select: 'name specialization' },
+    ]);
+
+    res.status(200).json({ 
+      message: 'Prescription acknowledged successfully',
+      prescription 
+    });
+  } catch (err) {
+    console.error('acknowledgePrescription error:', err);
+    res.status(500).json({ error: 'Failed to acknowledge prescription', detail: err.message });
   }
 };

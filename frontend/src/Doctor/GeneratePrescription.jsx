@@ -5,33 +5,62 @@ import axios from 'axios';
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const GeneratePrescription = () => {
+  const [appointments, setAppointments] = useState([]);
   const [transcriptFiles, setTranscriptFiles] = useState([]);
   const [form, setForm] = useState({
     appointmentId: '',
     patientId:     '',
+    patientName:   '',
     transcriptFile: '',
   });
   const [loading,      setLoading]      = useState(false);
   const [prescription, setPrescription] = useState(null);
   const [error,        setError]        = useState('');
+  const [sending,      setSending]      = useState(false);
+  const [sendSuccess,  setSendSuccess]  = useState(false);
 
   const user  = JSON.parse(localStorage.getItem('user') || '{}');
   const token = localStorage.getItem('token');
 
-  // Load list of saved transcripts from server  (list /upload directory)
+  // Load doctor's appointments and available transcripts on mount
   useEffect(() => {
-    const fetchFiles = async () => {
+    const fetchData = async () => {
       try {
-        const res = await axios.get(`${API}/api/transcripts/list`, {
+        // Fetch appointments where this doctor is involved
+        const appointmentsRes = await axios.get(
+          `${API}/api/prescriptions/doctor/${user.id}/appointments`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setAppointments(appointmentsRes.data || []);
+
+        // Fetch available transcript files
+        const filesRes = await axios.get(`${API}/api/transcripts/list`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setTranscriptFiles(res.data || []);
-      } catch {
-        // Endpoint may not exist yet — silently ignore
+        setTranscriptFiles(filesRes.data || []);
+      } catch (err) {
+        console.error('Error fetching data:', err);
       }
     };
-    fetchFiles();
-  }, []);
+    fetchData();
+  }, [user.id, token]);
+
+  // When appointment is selected, auto-populate patient info
+  const handleAppointmentSelect = (e) => {
+    const selectedId = e.target.value;
+    const selected = appointments.find(apt => apt.appointmentId === selectedId);
+    
+    if (selected) {
+      setForm({
+        appointmentId: selected.appointmentId,
+        patientId: selected.patientId,
+        patientName: selected.patientName,
+        transcriptFile: `${selected.patientName}.json`, // Default to patient name format
+      });
+    } else {
+      setForm({ appointmentId: '', patientId: '', patientName: '', transcriptFile: '' });
+    }
+  };
 
   const handleGenerate = async (e) => {
     e.preventDefault();
@@ -41,10 +70,14 @@ const GeneratePrescription = () => {
     try {
       const res = await axios.post(
         `${API}/api/prescriptions/generate`,
-        { ...form, doctorId: user.id },
+        { 
+          ...form, 
+          doctorId: user.id 
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setPrescription(res.data.prescription);
+      setSendSuccess(false);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to generate prescription');
     } finally {
@@ -52,12 +85,31 @@ const GeneratePrescription = () => {
     }
   };
 
+  const handleSendToPatient = async () => {
+    setSending(true);
+    setError('');
+
+    try {
+      const res = await axios.post(
+        `${API}/api/prescriptions/${prescription._id}/send`,
+        { doctorId: user.id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setPrescription(res.data.prescription);
+      setSendSuccess(true);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to send prescription');
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <div className="container mt-4">
       <h3 className="mb-4">🤖 AI Generate Prescription</h3>
       <p className="text-muted">
-        After a video consultation, select the saved transcript to generate a structured prescription
-        using Claude AI.
+        Select a patient from your appointments, choose the transcript file, and generate a structured 
+        prescription using Claude AI.
       </p>
 
       {error && <div className="alert alert-danger">{error}</div>}
@@ -65,26 +117,43 @@ const GeneratePrescription = () => {
       <div className="card p-4 shadow-sm mb-4">
         <form onSubmit={handleGenerate}>
           <div className="mb-3">
-            <label className="form-label">Appointment ID *</label>
-            <input
-              className="form-control"
-              placeholder="Paste appointment _id from MongoDB"
+            <label className="form-label">Select Patient *</label>
+            <select
+              className="form-select"
               value={form.appointmentId}
-              onChange={e => setForm({ ...form, appointmentId: e.target.value })}
+              onChange={handleAppointmentSelect}
               required
-            />
+            >
+              <option value="">-- Select a patient from your appointments --</option>
+              {appointments.map(apt => (
+                <option key={apt.appointmentId} value={apt.appointmentId}>
+                  {apt.patientName} (Scheduled: {new Date(apt.scheduledDate).toLocaleDateString()})
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="mb-3">
-            <label className="form-label">Patient ID *</label>
-            <input
-              className="form-control"
-              placeholder="Patient's user _id"
-              value={form.patientId}
-              onChange={e => setForm({ ...form, patientId: e.target.value })}
-              required
-            />
-          </div>
+          {form.patientName && (
+            <>
+              <div className="mb-3">
+                <label className="form-label">Patient Name</label>
+                <input
+                  className="form-control"
+                  value={form.patientName}
+                  disabled
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label">Appointment ID</label>
+                <input
+                  className="form-control"
+                  value={form.appointmentId}
+                  disabled
+                />
+              </div>
+            </>
+          )}
 
           <div className="mb-3">
             <label className="form-label">Transcript File *</label>
@@ -103,7 +172,11 @@ const GeneratePrescription = () => {
             ) : (
               <input
                 className="form-control"
-                placeholder="e.g. transcript-abc123-1700000000.json"
+                placeholder={
+                  form.patientName 
+                    ? `${form.patientName}.json` 
+                    : 'e.g. transaction-abc123-1700000000.json'
+                }
                 value={form.transcriptFile}
                 onChange={e => setForm({ ...form, transcriptFile: e.target.value })}
                 required
@@ -111,7 +184,7 @@ const GeneratePrescription = () => {
             )}
           </div>
 
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <button type="submit" className="btn btn-primary" disabled={loading || !form.appointmentId}>
             {loading ? (
               <><span className="spinner-border spinner-border-sm me-2" />Generating with AI…</>
             ) : '⚡ Generate Prescription'}
@@ -122,7 +195,40 @@ const GeneratePrescription = () => {
       {/* ── Prescription Preview ── */}
       {prescription && (
         <div className="card p-4 shadow border-success">
-          <h4 className="text-success mb-3">✅ Prescription Generated</h4>
+          <div className="d-flex justify-content-between align-items-start mb-3">
+            <div>
+              <h4 className="text-success mb-0">✅ Prescription Generated</h4>
+              <small className="text-muted">Status: {prescription.prescriptionStatus}</small>
+            </div>
+            <div>
+              {prescription.prescriptionStatus === 'draft' && (
+                <button
+                  className="btn btn-success"
+                  onClick={handleSendToPatient}
+                  disabled={sending}
+                >
+                  {sending ? (
+                    <><span className="spinner-border spinner-border-sm me-2" />Sending…</>
+                  ) : '📤 Send to Patient'}
+                </button>
+              )}
+              {prescription.prescriptionStatus === 'sent' && (
+                <span className="badge bg-info">✓ Sent to Patient</span>
+              )}
+              {prescription.prescriptionStatus === 'verified' && (
+                <span className="badge bg-warning">✓ Verified by Patient</span>
+              )}
+              {prescription.prescriptionStatus === 'acknowledged' && (
+                <span className="badge bg-success">✓ Acknowledged</span>
+              )}
+            </div>
+          </div>
+
+          {prescription.sentAt && (
+            <p className="text-muted mb-2">
+              <small>📨 Sent at: {new Date(prescription.sentAt).toLocaleString()}</small>
+            </p>
+          )}
 
           <div className="row mb-3">
             <div className="col-md-6">
